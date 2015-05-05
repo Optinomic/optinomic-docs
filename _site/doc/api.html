@@ -75,9 +75,402 @@
     </h2>
 </div>
 
-<h2 id="api---documentation">API - Documentation</h2>
+<h1 id="generalities">Generalities</h1>
 
-<p>This is <code>Something</code> really cool.</p>
+<p>Every endpoint returns a JSON object with a key describing the data returned, e.g. <code>/patients</code> returns <code>{&quot;patients&quot;: [...]}</code> and <code>/patients/1</code> returns <code>{&quot;patient&quot;: ... }</code>. This is for consistency and because it must always return an object.</p>
+
+<h2 id="errors">Errors</h2>
+
+<p>In case of errors (4xx or 5xx), a JSON object is returned with an error key, e.g. </p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">$ curl localhost:3001/signin -X POST -d &#39;email=admin@optinomics.com&#39;
+{&quot;error&quot;:&quot;Parameter \&quot;password\&quot; is missing.&quot;}
+</code></pre></div>
+<h2 id="entities-vs-objects">Entities vs objects</h2>
+
+<p><strong>Changed: all endpoints return entities</strong></p>
+
+<p>Depending on the context, elements such as patients, modules, etc. are returned as-is or as an entity. For instance, when requesting a specific patient with <code>/patients/42</code>, it is useless to return the ID 42 so the patient is returned like this:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">{&quot;patient&quot;:{&quot;email&quot;:&quot;a@b.com&quot;,...}}
+</code></pre></div>
+<p>On the other hand, when requesting the watchlist with <code>/watchlist/1</code>, we need to return patient IDs so the API returns entities like this:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">{
+  &quot;patients&quot;: [
+    {
+      &quot;id&quot;: 42,
+      &quot;data&quot;: { &quot;email&quot;: &quot;a@b.com&quot;, ... }
+    }, ...
+  ]
+}
+</code></pre></div>
+<p>In the documentation thereafter, it will be shown with <code>ENTITY</code> and <code>OBJECT</code>.</p>
+
+<h2 id="lists-as-parameters">Lists as parameters</h2>
+
+<p>When the following documentation specifies a parameter such as <code>modules</code> as a parameter being a list, the client should set the parameter <code>modules_count</code> to the number of items in the list and <code>modulesN</code> to the value for each item. For example, if <code>modules = [&quot;first&quot;, &quot;second&quot;]</code>, the corresponding query string is <code>modules_count=2&amp;modules0=first&amp;modules1=second</code>.</p>
+
+<h1 id="endpoints">Endpoints</h1>
+
+<p>The front-end should take care of all possible cases, the API might return an 500 (or other) for all endpoints. For example, if a parameter is missing, it returns a 400 Bad Request or, if not logged in or with the wrong user, it might return a 401 Unauthorized. Or even a 404 if something is not found.</p>
+
+<h2 id="post-/signin">POST /signin</h2>
+
+<p><strong>Parameters:</strong> <code>email</code>, <code>password</code></p>
+
+<p><strong>Responses:</strong>
+* 401 Unauthorized if the credentials are wrong
+* 200 OK in case of success with a JSON like this: <code>{&quot;user_id&quot;: 1, &quot;token&quot;: &quot;b2bb30a2-72bb-4446-be0e-1942a8d9c202&quot;}</code>.</p>
+
+<p>The front-end must then send this token as a HTTP header named <code>X-API-Token</code> in all following requests to the API. Also, the server does not know the current user when receiving requests, that&#39;s why it is returned when signing in so the front-end can keep it in memory and use it later on when, for example, requesting the watchlist with <code>POST /watchlist/USER_ID</code>.</p>
+
+<h2 id="post-/signout">POST /signout</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 204 No Content (no JSON)</p>
+
+<h2 id="get-/watchlist/:user_id">GET /watchlist/:user_id</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;patients&quot;: [ENTITIES]}</code>.</p>
+
+<h2 id="post-/watchlist/:user_id/watch/:patient_id">POST /watchlist/:user_id/watch/:patient_id</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 204 No Content (no JSON) in case of success.</p>
+
+<h2 id="post-/watchlist/:user_id/unwatch/:patient_id">POST /watchlist/:user_id/unwatch/:patient_id</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 204 No Content (no JSON) in case of success.</p>
+
+<h2 id="post-/patients">POST /patients</h2>
+
+<p><strong>Parameters:</strong> <code>first_name</code>, <code>last_name</code>, <code>birth_name</code>, <code>gender</code>, <code>title</code>, <code>birthdate</code>, <code>address1</code>, <code>address2</code>, <code>city</code>, <code>zip_code</code>, <code>country</code>, <code>language</code>, <code>deceased</code>, <code>email</code>, <code>phone_home</code>, <code>phone_mobile</code>, <code>cis_pid</code>, <code>ahv</code>, <code>notes</code>, <code>four_letter_code</code></p>
+
+<p><strong>Responses:</strong>
+* 400 Bad Request in case of missing parameters or validation error
+* 201 Created with a JSON like this: <code>{&quot;patient&quot;: ENTITY}</code>.</p>
+
+<h2 id="get-/patients">GET /patients</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;patients&quot;: [ENTITIES]}</code>.</p>
+
+<h2 id="get-/patients/:patient_id">GET /patients/:patient_id</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;patient&quot;: PATIENT}</code>.</p>
+
+<h2 id="put-/patients/:patient_id">PUT /patients/:patient_id</h2>
+
+<p><strong>Parameters:</strong> <code>first_name</code>, <code>last_name</code>, <code>birth_name</code>, <code>gender</code>, <code>title</code>, <code>birthdate</code>, <code>address1</code>, <code>address2</code>, <code>city</code>, <code>zip_code</code>, <code>country</code>, <code>language</code>, <code>deceased</code>, <code>email</code>, <code>phone_home</code>, <code>phone_mobile</code>, <code>cis_pid</code>, <code>ahv</code>, <code>notes</code>, <code>four_letter_code</code></p>
+
+<p><strong>Responses:</strong>
+* 400 Bad Request in case of missing parameters or validation error
+* 204 No Content (no JSON) in case of success</p>
+
+<h2 id="delete-/patients/:patient_id">DELETE /patients/:patient_id</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 204 No Content (no JSON)</p>
+
+<h2 id="get-/patients/:patient_id/stays">GET /patients/:patient_id/stays</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;stays&quot;: [ENTITIES]}</code>.</p>
+
+<h2 id="put-/stays/:stay_id">PUT /stays/:stay_id</h2>
+
+<p><strong>Parameters:</strong> <code>therapist_id</code> (this is to overwrite the therapist set by the CIS interface, leave empty to use the default one)</p>
+
+<p><strong>Responses:</strong>
+* 400 Bad request in case of missing parameter
+* 204 No Content (no JSON) in case of succes</p>
+
+<h2 id="post-/users">POST /users</h2>
+
+<p><strong>Parameters:</strong> <code>email</code>, <code>password</code>, <code>gender</code>, <code>title</code>, <code>first_name</code>, <code>last_name</code>, <code>birthday</code>, <code>phone</code>, <code>description</code>, <code>role</code>, <code>initials</code>, <code>ou</code>, <code>cis_uid</code></p>
+
+<p><strong>Responses:</strong>
+* 400 Bad Request in case of missing parameters or validation error
+* 401 Unauthorized when trying to create a user with admin role from an account without admin access
+* 201 Created with a JSON like this: <code>{&quot;user&quot;: ENTITY}</code></p>
+
+<h2 id="get-/users">GET /users</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;users&quot;: [ENTITIES]}</code>.</p>
+
+<h2 id="get-/users/:user_id">GET /users/:user_id</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;user&quot;: ENTITY}</code>.</p>
+
+<h2 id="put-/users/:user_id">PUT /users/:user_id</h2>
+
+<p><strong>Parameters:</strong> <code>email</code>, <code>gender</code>, <code>title</code>, <code>first_name</code>, <code>last_name</code>, <code>birthday</code>, <code>phone</code>, <code>description</code>, <code>initials</code>, <code>ou</code>, <code>cis_uid</code></p>
+
+<p><strong>Responses:</strong>
+* 400 Bad Request in case of missing parameter or validation error
+* 204 No Content (no JSON) in case of success</p>
+
+<h2 id="delete-/users/:user_id">DELETE /users/:user_id</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 204 No Content (no JSON)</p>
+
+<h2 id="get-/patients/:patient_id/modules">GET /patients/:patient_id/modules</h2>
+
+<p><strong>Parameters:</strong> <code>stay_id</code> (optional)</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;activated_patient_uses_modules&quot;: [{&quot;entity&quot;: PUM ENTITY, &quot;module&quot;: MODULE OBJECT}], &quot;deactivated_modules&quot;: [MODULE OBJECTS]}</code> (modules are not in the DB, so not entities) with deactivated modules empty if <code>stay_id</code> is passed.</p>
+
+<h2 id="post-/patients/:patient_id/activate_module">POST /patients/:patient_id/activate_module</h2>
+
+<p><strong>Parameters:</strong> <code>module_identifier</code> and <code>stay_id</code> (optional)</p>
+
+<p><strong>Responses:</strong>
+* 400 Bad Request in case of missing parameter or validation error (e.g. module already activated)
+* 204 No Content (no JSON) in case of success</p>
+
+<h2 id="post-/patients/:patient_id/deactivate_module">POST /patients/:patient_id/deactivate_module</h2>
+
+<p><strong>Parameters:</strong> <code>module_identifier</code>, <code>stay_id</code> (optional)</p>
+
+<p><strong>Responses:</strong>
+* 400 Bad Request in case of missing parameter
+* 204 No Content (no JSON) in case of success</p>
+
+<p>Note: If no <code>stay_id</code> is given, any patient_uses_module will be deleted.</p>
+
+<h2 id="get-/patients/:patient_id/events">GET /patients/:patient_id/events</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this <code>{&quot;events&quot;: [ENTITIES]}</code></p>
+
+<h2 id="post-/patient_uses_modules/:patient_uses_module_id/schedule_survey">POST /patient_uses_modules/:patient_uses_module_id/schedule_survey</h2>
+
+<p><strong>Parameters:</strong> <code>survey_identifier</code></p>
+
+<p><strong>Responses:</strong>
+* 201 Created with a JSON like this <code>{&quot;event&quot;: ENTITY}</code></p>
+
+<h2 id="get-/patients/:patient_id/survey_responses/:module_identifier">GET /patients/:patient_id/survey_responses/:module_identifier</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this <code>{&quot;survey_responses&quot;: [ENTITY]}</code></p>
+
+<h2 id="post-/run_sql">POST /run_sql</h2>
+
+<p><strong>Parameters:</strong> <code>query</code> and <code>delimiter</code> (optional, default &#39;;&#39;)</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with CSV as the response body</p>
+
+<h2 id="get-/patient_groups">GET /patient_groups</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;patient_groups&quot;: [ENTITIES]}</code></p>
+
+<h2 id="post-/patient_groups">POST /patient_groups</h2>
+
+<p><strong>Parameters:</strong> <code>name</code>, <code>sql_filter</code> and <code>modules</code> (list)</p>
+
+<p><strong>Responses:</strong>
+* 400 Bad Request in case of validation error or missing parameter
+* 401 Unauthorized if not admin (as the user can write SQL)
+* 201 Created with a JSON like this: <code>{&quot;patient_group&quot;: ENTITY}</code></p>
+
+<h2 id="put-/patient_groups/:patient_group_id">PUT /patient_groups/:patient_group_id</h2>
+
+<p><strong>Parameters:</strong> <code>name</code>, <code>sql_filter</code> and <code>modules</code> (list)</p>
+
+<p><strong>Responses:</strong>
+* 400 Bad Request in case of validation error or missing parameter
+* 401 Unauthorized if not admin
+* 204 No Content (no JSON)</p>
+
+<h2 id="delete-/patient_groups/:patient_group_id">DELETE /patient_groups/:patient_group_id</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 204 No Content (no JSON)</p>
+
+<h2 id="get-/patient_groups/:patient_group_id/patients">GET /patient_groups/:patient_group_id/patients</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;patients&quot;: [ENTITIES]}</code></p>
+
+<h2 id="get-/modules">GET /modules</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;modules&quot;: [OBJECTS]}</code></p>
+
+<h2 id="get-/modules/disabled">GET /modules/disabled</h2>
+
+<p>Return the list of modules installed but not yet enabled in the application.</p>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;modules&quot;: [OBJECTS]}</code></p>
+
+<h2 id="get-/modules/errors">GET /modules/errors</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;module_errors&quot;: [STRINGS]}</code></p>
+
+<h2 id="get-/module_activations">GET /module_activations</h2>
+
+<p>Return the list of all module activations, that is, all the entities in the DB enabling an installed module. These entities contain an optional name overwrite for the module. Deleting one will disable the module.</p>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with a JSON like this: <code>{&quot;module_activations&quot;: [ENTITIES]}</code></p>
+
+<h2 id="post-/module_activations">POST /module_activations</h2>
+
+<p><strong>Parameters:</strong> <code>module_identifier</code>, <code>name_overwrite</code></p>
+
+<p><strong>Responses:</strong>
+* 400 Bad Request in case of validation error
+* 200 OK with a JSON like this: <code>{&quot;module_activation&quot;: ENTITY}</code></p>
+
+<h2 id="put-/module_activations/:activation_id">PUT /module_activations/:activation_id</h2>
+
+<p><strong>Parameters:</strong> <code>name_overwrite</code></p>
+
+<p><strong>Responses:</strong>
+* 400 Bad Request in case of validation error
+* 204 No Content (no JSON) in case of success</p>
+
+<h2 id="delete-/module_activations/:activation_id">DELETE /module_activations/:activation_id</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 204 No Content (no JSON) in case of success</p>
+
+<h2 id="get-/modules/:module_identifier/view/:location">GET /modules/:module_identifier/view/:location</h2>
+
+<p><strong>Parameters:</strong> None</p>
+
+<p><strong>Responses:</strong>
+* 200 OK with HTML that can be shown in an iframe</p>
+
+<p><strong>Notes:</strong> 
+* Available locations are specified in the module JSON. (see GET /modules for example)
+* Some helpers are available to the module&#39;s JS. For them to work, some data need to be passed in the URL hash. Here&#39;s how to include a module view in a page:</p>
+<div class="highlight"><pre><code class="language-html" data-lang="html"><span class="nt">&lt;iframe</span> <span class="na">src=</span><span class="s">&quot;/modules/some_module/view/dashboard#patient_id=2,token=542b2a71-c6b3-424c-939d-8ab5e57c8193&quot;</span><span class="nt">&gt;</span>
+<span class="nt">&lt;/iframe&gt;</span>
+</code></pre></div>
+<h1 id="examples">Examples</h1>
+
+<h2 id="patient-groups">Patient groups</h2>
+
+<p>Let&#39;s create a patient group that filters only men from Switzerland and activate the module with ID &quot;1&quot;.</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">$ curl -v -H &#39;X-API-Token: 79dca73c-68c4-4ace-b9a3-badf384b6e25&#39; localhost:3001/patient_groups -X POST -d &#39;sql_filter=gender%20%3D%20%27Male%27%20AND%20country%20%3D%20%27CH%27&amp;name=my_patient_group&amp;modules_count=1&amp;modules0=1&#39;
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+* Connected to localhost (127.0.0.1) port 3001 (#0)
+&gt; POST /patient_groups HTTP/1.1
+&gt; User-Agent: curl/7.37.0
+&gt; Host: localhost:3001
+&gt; Accept: */*
+&gt; X-API-Token: 79dca73c-68c4-4ace-b9a3-badf384b6e25
+&gt; Content-Length: 118
+&gt; Content-Type: application/x-www-form-urlencoded
+&gt;
+* upload completely sent off: 118 out of 118 bytes
+&lt; HTTP/1.1 201 Created
+&lt; Transfer-Encoding: chunked
+&lt; Date: Thu, 26 Mar 2015 10:18:56 GMT
+* Server Warp/3.0.5.2 is not blacklisted
+&lt; Server: Warp/3.0.5.2
+&lt; Set-Cookie: session=1w; path=/; expires=Sat, 26-May-2018 20:05:35 UTC;
+&lt; Content-Type: application/json; charset=utf-8
+&lt;
+* Connection #0 to host localhost left intact
+{&quot;patient_group&quot;:{&quot;id&quot;:1,&quot;data&quot;:...}}
+</code></pre></div>
+<p>The patient group has been created:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">$ curl -v -H &#39;X-API-Token: 79dca73c-68c4-4ace-b9a3-badf384b6e25&#39; localhost:3001/patient_groups | jq .
+* Hostname was NOT found in DNS cache
+*   Trying 127.0.0.1...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* Connected to localhost (127.0.0.1) port 3001 (#0)
+&gt; GET /patient_groups HTTP/1.1
+&gt; User-Agent: curl/7.37.0
+&gt; Host: localhost:3001
+&gt; Accept: */*
+&gt; X-API-Token: 79dca73c-68c4-4ace-b9a3-badf384b6e25
+&gt;
+&lt; HTTP/1.1 200 OK
+&lt; Transfer-Encoding: chunked
+&lt; Date: Thu, 26 Mar 2015 10:20:01 GMT
+* Server Warp/3.0.5.2 is not blacklisted
+&lt; Server: Warp/3.0.5.2
+&lt; Set-Cookie: session=ZA; path=/; expires=Sat, 26-May-2018 20:06:40 UTC;
+&lt; Content-Type: application/json; charset=utf-8
+&lt;
+{ [data not shown]
+100   130    0   130    0     0  23465      0 --:--:-- --:--:-- --:--:-- 43333
+* Connection #0 to host localhost left intact
+{
+  &quot;patient_groups&quot;: [
+    {
+      &quot;id&quot;: 1,
+      &quot;data&quot;: {
+        &quot;name&quot;: &quot;my_patient_group&quot;,
+        &quot;sql_filter&quot;: &quot;gender = &#39;Male&#39; AND country = &#39;CH&#39;&quot;,
+        &quot;modules&quot;: [
+          &quot;1&quot;
+        ]
+      }
+    }
+  ]
+}
+</code></pre></div>
+<p>In the background, a CRON task (the executable is <code>therapy-server-patient-groups</code>) will detect patients belonging to a group and activate the specified modules for them.</p>
+
+<p>When modifying a patient group, adding a module will activate for all already-detected patients in a group.</p>
 
 
                     </div>
