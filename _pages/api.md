@@ -1,1 +1,12 @@
-/Users/Beat/Documents/GitHub/optinomic-docs/_posts/2015-05-05-api.md
+---
+layout: page
+title: "API"
+category: doc
+date: 2015-05-05 11:16:50
+---
+
+
+##API - Documentation
+
+This is ```Something``` really cool.
+
